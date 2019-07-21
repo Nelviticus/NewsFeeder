@@ -1,0 +1,16 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = Model.Title;
+}
+<?xml version="1.0" encoding="utf-8"?>
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+    <channel>
+        <title>@Model.Title</title>
+        <link>@Model.SourceLink</link>
+        <description>@Model.Description</description>
+        <atom:link href="@Model.SelfLink" rel="self"></atom:link>
+        <language>en-GB</language>
+        @Html.Raw(Model.Body)
+    </channel>
+</rss>
