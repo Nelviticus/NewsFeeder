@@ -7,9 +7,10 @@
         string Title { get; set; }
         string Link { get; set; }
         string Description { get; set; }
-        DateTime PubDate { get; set; }
+        string PubDate { get; }
+        DateTime PublicationDate { set; }
         string Comments { get; set; }
         string Guid { get; set; }
-        string ImageSrc { get; set; }
+        string ImageSrc { set; }
     }
 }

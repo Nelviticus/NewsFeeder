@@ -5,22 +5,34 @@
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Text;
 
     public class EmpireNewsRepository: INewsRepository
     {
-        public string Title { get; }
-        public string SourceLink { get; }
-        public string Description { get; }
+        public string Title => "Empire Latest Movie News";
+        public string SourceLink => "https://www.empireonline.com/movies/news/";
+        public string Description => "The latest movie news from Empire magazine";
+
+        public string Body
+        {
+            get
+            {
+                StringBuilder feedBuilder = new StringBuilder();
+                feedBuilder.Append("<lastBuildDate>");
+                feedBuilder.Append(DateTime.Now.ToString("ddd, dd MMM yyyy HH:mm:ss K"));
+                feedBuilder.Append("</lastBuildDate>");
+
+                foreach (INewsArticle newsArticle in NewsArticles())
+                {
+                    feedBuilder.Append(newsArticle);
+                }
+
+                return feedBuilder.ToString();
+            }
+        }
 
         private string _empireUrl = "https://www.empireonline.com";
         private readonly List<INewsArticle> _newsArticles = new List<INewsArticle>();
-
-        public EmpireNewsRepository()
-        {
-            Title = "Empire Latest Movie News";
-            SourceLink = "https://www.empireonline.com/movies/news/";
-            Description = "The latest movie news from Empire magazine";
-        }
 
         public IEnumerable<INewsArticle> NewsArticles()
         {
@@ -39,6 +51,7 @@
             {
                 AddNewsArticle(cardNode);
             }
+
             return _newsArticles;
         }
 
@@ -113,7 +126,7 @@
                 }
                 finally
                 {
-                    article.PubDate = pubDate.AddMinutes(-_newsArticles.Count);
+                    article.PublicationDate = pubDate.AddMinutes(-_newsArticles.Count);
                 }
             }
 
