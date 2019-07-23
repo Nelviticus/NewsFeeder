@@ -13,7 +13,7 @@
 
         public string Title
         {
-            get => $"<title>{_title}</Title>";
+            get => $"<title>{_title}</title>";
             set => _title = value;
         }
 

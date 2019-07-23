@@ -3,7 +3,7 @@
     using Microsoft.AspNetCore.Mvc.RazorPages;
     using Repositories;
 
-    public class EmpireTestModel : PageModel
+    public class EmpireNewsModel : PageModel
     {
         public string Body { get; set; }
         public string Title { get; set; }
