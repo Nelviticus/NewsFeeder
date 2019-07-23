@@ -14,7 +14,7 @@
         public void OnGet()
         {
             SelfLink = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}{HttpContext.Request.Path}{HttpContext.Request.QueryString}";
-            EmpireNewsRepository repository = new EmpireNewsRepository();
+            INewsRepository repository = new EmpireNewsRepository();
             Title = repository.Title;
             SourceLink = repository.SourceLink;
             Description = repository.Description;

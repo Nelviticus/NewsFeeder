@@ -82,9 +82,11 @@
                 {
                     article.Link = linkHref;
                 }
+
+                article.Description = GetArticleDescription(linkHref.StartsWith("http") ? linkHref : $"{_empireUrl}{linkHref}");
             }
 
-            if (paragraphNodes.Any())
+            if (article.Description == string.Empty && paragraphNodes.Any())
             {
                 article.Description = paragraphNodes.First().InnerText;
             }
@@ -131,6 +133,21 @@
             }
 
             _newsArticles.Add(article);
+        }
+
+        private string GetArticleDescription(string articleLink)
+        {
+            HtmlWeb articleWeb = new HtmlWeb();
+            HtmlDocument articleDocument = articleWeb.Load(articleLink);
+            HtmlNode contentNode = articleDocument.DocumentNode.SelectSingleNode("//div[contains(concat(' ', normalize-space(@class), ' '), ' article__content ')]");
+            IEnumerable<HtmlNode> paragraphNodes = contentNode.Descendants("p");
+            StringBuilder descriptionBuilder = new StringBuilder();
+            foreach (HtmlNode paragraphNode in paragraphNodes)
+            {
+                descriptionBuilder.Append(paragraphNode.OuterHtml);
+            }
+
+            return System.Web.HttpUtility.HtmlEncode(descriptionBuilder.ToString());
         }
     }
 }
