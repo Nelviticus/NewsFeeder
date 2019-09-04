@@ -6,6 +6,20 @@
     using System.Collections.Generic;
     using System.Linq;
     using System.Text;
+    using Newtonsoft.Json;
+
+    public class JsonArticle
+    {
+        public string Id { get; set; }
+        public string Title { get; set; }
+        public string Description { get; set; }
+        public string Date { get; set; }
+        public string Rating { get; set; }
+        public string Sources { get; set; }
+        public string Icon { get; set; }
+        public string Url { get; set; }
+        public string Category { get; set; }
+    }
 
     public class EmpireNewsRepository: INewsRepository
     {
@@ -39,6 +53,35 @@
             HtmlWeb newsWeb = new HtmlWeb();
 
             HtmlDocument newsDocument = newsWeb.Load(SourceLink);
+
+            HtmlNodeCollection scriptNodeList = newsDocument.DocumentNode.SelectNodes("//script");
+
+            if (scriptNodeList == null)
+                return _newsArticles;
+
+            foreach (HtmlNode scriptNode in scriptNodeList)
+            {
+                string nodeText = scriptNode.InnerText;
+                if (!nodeText.Contains("window.bootstrapComponents.push"))
+                    continue;
+
+                for (int i = nodeText.IndexOf('{'); i > -1; i = nodeText.IndexOf('{', i + 1))
+                {
+                    for (int j = nodeText.LastIndexOf('}'); j > -1; j = nodeText.LastIndexOf("}", j - 1, StringComparison.Ordinal))
+                    {
+                        string jsonProbe = nodeText.Substring(i, j - i + 1);
+                        try
+                        {
+                            JsonArticle jsonArticle = JsonConvert.DeserializeObject<JsonArticle>(jsonProbe);
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine(e);
+                            continue;
+                        }
+                    }
+                }
+            }
 
             HtmlNodeCollection cardNodeList = newsDocument.DocumentNode.SelectNodes("//div[contains(concat(' ', normalize-space(@class), ' '), ' card ')]");
 
