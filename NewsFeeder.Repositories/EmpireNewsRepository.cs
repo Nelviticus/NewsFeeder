@@ -101,6 +101,43 @@
                         nodeText.LastIndexOf("}", StringComparison.Ordinal) -
                         nodeText.IndexOf("{", StringComparison.Ordinal) + 1);
                     NewsItemChunk newsItemChunk = JsonConvert.DeserializeObject<NewsItemChunk>(nodeJson);
+
+                    foreach (Item item in newsItemChunk.data.items)
+                    {
+                        NewsArticle article = new NewsArticle();
+                        article.Title = item.title;
+                        article.Link = $"{_empireUrl}{item.url}";
+                        article.Description = GetArticleDescription($"{_empireUrl}{item.url}");
+                        string[] dateElements = item.date.Split(' ');
+                        DateTime pubDate = DateTime.UtcNow;
+                        try
+                        {
+                            switch (dateElements[1])
+                            {
+                                case "hour":
+                                    pubDate = pubDate.AddHours(-1);
+                                    break;
+                                case "hours":
+                                    pubDate = pubDate.AddHours(0d - double.Parse(dateElements[0]));
+                                    break;
+                                case "day":
+                                    pubDate = pubDate.AddDays(-1);
+                                    break;
+                                case "days":
+                                    pubDate = pubDate.AddDays(0d - double.Parse(dateElements[0]));
+                                    break;
+                            }
+                        }
+                        finally
+                        {
+                            article.PublicationDate = pubDate.AddMinutes(-_newsArticles.Count);
+                        }
+                        article.Guid = item.id;
+                        string imgSrc = item.sources.First().src.Replace("width=750", "width=150");
+                        article.ImageSrc = $"https:{imgSrc}";
+
+                        _newsArticles.Add(article);
+                    }
                 }
                 catch (Exception e)
                 {
@@ -108,6 +145,8 @@
                     continue;
                 }
             }
+
+            return _newsArticles;
 
             HtmlNodeCollection cardNodeList = newsDocument.DocumentNode.SelectNodes("//div[contains(concat(' ', normalize-space(@class), ' '), ' card ')]");
 
