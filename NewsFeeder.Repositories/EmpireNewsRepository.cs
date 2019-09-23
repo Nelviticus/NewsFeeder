@@ -93,7 +93,7 @@
 
             if (imageNodes.Any())
             {
-                string imgSrc = imageNodes.First().GetAttributeValue("src", string.Empty).Replace("width=750", "width=150");
+                string imgSrc = imageNodes.First().GetAttributeValue("src", string.Empty).Replace("width=750", "width=300").Replace("width=150", "width=300");
                 if (!imgSrc.StartsWith("http"))
                 {
                     article.ImageSrc = $"http:{imgSrc}";
@@ -140,6 +140,8 @@
             HtmlWeb articleWeb = new HtmlWeb();
             HtmlDocument articleDocument = articleWeb.Load(articleLink);
             HtmlNode contentNode = articleDocument.DocumentNode.SelectSingleNode("//div[contains(concat(' ', normalize-space(@class), ' '), ' article__content ')]");
+            if (contentNode == null)
+                return string.Empty;
             IEnumerable<HtmlNode> paragraphNodes = contentNode.Descendants("p");
             StringBuilder descriptionBuilder = new StringBuilder();
             foreach (HtmlNode paragraphNode in paragraphNodes)
