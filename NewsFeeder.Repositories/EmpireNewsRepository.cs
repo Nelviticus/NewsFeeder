@@ -8,17 +8,44 @@
     using System.Text;
     using Newtonsoft.Json;
 
-    public class JsonArticle
+    public class Source
     {
-        public string Id { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public string Date { get; set; }
-        public string Rating { get; set; }
-        public string Sources { get; set; }
-        public string Icon { get; set; }
-        public string Url { get; set; }
-        public string Category { get; set; }
+        public string altText { get; set; }
+        public string src { get; set; }
+        public int media { get; set; }
+    }
+
+    public class Category
+    {
+        public string name { get; set; }
+        public string url { get; set; }
+    }
+
+    public class Item
+    {
+        public string id { get; set; }
+        public string title { get; set; }
+        public string description { get; set; }
+        public string date { get; set; }
+        public object rating { get; set; }
+        public List<Source> sources { get; set; }
+        public string icon { get; set; }
+        public string url { get; set; }
+        public Category category { get; set; }
+    }
+
+    public class Data
+    {
+        public List<Item> items { get; set; }
+        public string type { get; set; }
+        public string componentId { get; set; }
+    }
+
+    public class NewsItemChunk
+    {
+        public string id { get; set; }
+        public string name { get; set; }
+        public Data data { get; set; }
     }
 
     public class EmpireNewsRepository: INewsRepository
@@ -62,24 +89,23 @@
             foreach (HtmlNode scriptNode in scriptNodeList)
             {
                 string nodeText = scriptNode.InnerText;
-                if (!nodeText.Contains("window.bootstrapComponents.push"))
+                if (!nodeText.Contains("window.bootstrapComponents.push") 
+                    || !nodeText.Contains("cards") 
+                    || !nodeText.Contains('{') 
+                    || !nodeText.Contains('}'))
                     continue;
 
-                for (int i = nodeText.IndexOf('{'); i > -1; i = nodeText.IndexOf('{', i + 1))
+                try
                 {
-                    for (int j = nodeText.LastIndexOf('}'); j > -1; j = nodeText.LastIndexOf("}", j - 1, StringComparison.Ordinal))
-                    {
-                        string jsonProbe = nodeText.Substring(i, j - i + 1);
-                        try
-                        {
-                            JsonArticle jsonArticle = JsonConvert.DeserializeObject<JsonArticle>(jsonProbe);
-                        }
-                        catch (Exception e)
-                        {
-                            Console.WriteLine(e);
-                            continue;
-                        }
-                    }
+                    string nodeJson = nodeText.Substring(nodeText.IndexOf("{", StringComparison.Ordinal),
+                        nodeText.LastIndexOf("}", StringComparison.Ordinal) -
+                        nodeText.IndexOf("{", StringComparison.Ordinal) + 1);
+                    NewsItemChunk newsItemChunk = JsonConvert.DeserializeObject<NewsItemChunk>(nodeJson);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                    continue;
                 }
             }
 
