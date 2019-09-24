@@ -6,50 +6,11 @@
     using System.Collections.Generic;
     using System.Linq;
     using System.Text;
+    using DataTransferObjects.EmpireNews;
     using Newtonsoft.Json;
 
     public class EmpireNewsRepository: INewsRepository
     {
-        private struct Source
-        {
-            public string AltText { get; set; }
-            public string Src { get; set; }
-            public int Media { get; set; }
-        }
-
-        private struct Category
-        {
-            public string Name { get; set; }
-            public string Url { get; set; }
-        }
-
-        private struct Item
-        {
-            public string Id { get; set; }
-            public string Title { get; set; }
-            public string Description { get; set; }
-            public string Date { get; set; }
-            public object Rating { get; set; }
-            public List<Source> Sources { get; set; }
-            public string Icon { get; set; }
-            public string Url { get; set; }
-            public Category Category { get; set; }
-        }
-
-        private struct Data
-        {
-            public List<Item> Items { get; set; }
-            public string Type { get; set; }
-            public string ComponentId { get; set; }
-        }
-
-        private struct NewsItemChunk
-        {
-            public string Id { get; set; }
-            public string Name { get; set; }
-            public Data Data { get; set; }
-        }
-
         public string Title => "Empire Latest Movie News";
         public string SourceLink => "https://www.empireonline.com/movies/news/";
         public string Description => "The latest movie news from Empire magazine";
@@ -110,10 +71,13 @@
 
             foreach (Item item in newsItemChunk.Data.Items)
             {
-                NewsArticle article = new NewsArticle();
-                article.Title = System.Web.HttpUtility.HtmlEncode(item.Title);
-                article.Link = $"{_empireUrl}{item.Url}";
-                article.Description = GetArticleDescription($"{_empireUrl}{item.Url}");
+                NewsArticle article = new NewsArticle
+                {
+                    Guid = item.Id,
+                    Title = System.Web.HttpUtility.HtmlEncode(item.Title),
+                    Link = $"{_empireUrl}{item.Url}",
+                    Description = GetArticleDescription($"{_empireUrl}{item.Url}")
+                };
                 if (article.Description == string.Empty)
                 {
                     article.Description = item.Description;
@@ -144,8 +108,8 @@
                     article.PublicationDate = pubDate.AddMinutes(-_newsArticles.Count);
                 }
 
-                article.Guid = item.Id;
-                article.ImageSrc = $"https:{item.Sources.Last().Src}";
+                if (item.Sources.Any())
+                    article.ImageSrc = $"https:{item.Sources.Last().Src}";
 
                 _newsArticles.Add(article);
             }
