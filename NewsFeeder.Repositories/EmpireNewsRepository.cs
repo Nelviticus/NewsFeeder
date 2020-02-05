@@ -8,6 +8,7 @@
     using System.Text;
     using DataTransferObjects.EmpireNews;
     using Newtonsoft.Json;
+    using Microsoft.Extensions.Caching.Distributed;
 
     public class EmpireNewsRepository: INewsRepository
     {
@@ -17,6 +18,13 @@
         private string _empireUrl = "https://www.empireonline.com";
         private readonly List<INewsArticle> _newsArticles = new List<INewsArticle>();
         private readonly int _desiredImageWidth = 300;
+        private IDistributedCache _distributedCache;
+        private readonly DistributedCacheEntryOptions cacheEntryOptions = new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = new TimeSpan(1, 30, 0) };
+
+        public EmpireNewsRepository(IDistributedCache distributedCache)
+        {
+            _distributedCache = distributedCache;
+        }
 
         public string Body
         {
@@ -134,8 +142,20 @@
 
         private string GetArticleDescription(string articleLink)
         {
-            HtmlWeb articleWeb = new HtmlWeb();
-            HtmlDocument articleDocument = articleWeb.Load(articleLink);
+            HtmlDocument articleDocument;
+            string cachedDocument = _distributedCache.GetString(articleLink);
+            if (!string.IsNullOrEmpty(cachedDocument))
+            {
+                articleDocument = new HtmlDocument();
+                articleDocument.LoadHtml(cachedDocument);
+            }
+            else
+            {
+                HtmlWeb articleWeb = new HtmlWeb();
+                articleDocument = articleWeb.Load(articleLink);
+                _distributedCache.SetString(articleLink, articleDocument.DocumentNode.OuterHtml, cacheEntryOptions);
+            }
+
             HtmlNode contentNode = articleDocument.DocumentNode.SelectSingleNode("//div[contains(concat(' ', normalize-space(@class), ' '), ' article__content ')]");
             if (contentNode == null)
                 return string.Empty;

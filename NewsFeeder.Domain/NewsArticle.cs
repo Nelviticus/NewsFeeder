@@ -46,7 +46,6 @@
             set => _description = value;
         }
 
-
         public DateTime PublicationDate
         {
             set => _publicationDate = value;
