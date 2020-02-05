@@ -9,17 +9,18 @@
         private string _link;
         private string _description;
         private DateTime _publicationDate;
+        private string _comments;
         private string _guid;
 
         public string Title
         {
-            get => $"<title>{_title}</title>";
+            get => _title == string.Empty ? "<title/>" : $"<title>{_title}</title>";
             set => _title = value;
         }
 
         public string Link
         {
-            get => $"<link>{_link}</link>";
+            get => _link == string.Empty ? "<link/>" : $"<link>{_link}</link>";
             set => _link = value;
         }
 
@@ -45,7 +46,6 @@
             set => _description = value;
         }
 
-
         public DateTime PublicationDate
         {
             set => _publicationDate = value;
@@ -55,8 +55,8 @@
 
         public string Comments
         {
-            get => $"<comments>{ImageSrc}</comments>";
-            set => Comments = value;
+            get => _comments == string.Empty ? "<comments/>" : $"<comments>{_comments}</comments>";
+            set => _comments = value;
         }
 
         public string Guid {

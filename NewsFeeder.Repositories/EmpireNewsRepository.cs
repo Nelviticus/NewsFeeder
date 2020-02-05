@@ -6,12 +6,25 @@
     using System.Collections.Generic;
     using System.Linq;
     using System.Text;
+    using DataTransferObjects.EmpireNews;
+    using Newtonsoft.Json;
+    using Microsoft.Extensions.Caching.Distributed;
 
     public class EmpireNewsRepository: INewsRepository
     {
         public string Title => "Empire Latest Movie News";
         public string SourceLink => "https://www.empireonline.com/movies/news/";
         public string Description => "The latest movie news from Empire magazine";
+        private string _empireUrl = "https://www.empireonline.com";
+        private readonly List<INewsArticle> _newsArticles = new List<INewsArticle>();
+        private readonly int _desiredImageWidth = 300;
+        private IDistributedCache _distributedCache;
+        private readonly DistributedCacheEntryOptions cacheEntryOptions = new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = new TimeSpan(1, 30, 0) };
+
+        public EmpireNewsRepository(IDistributedCache distributedCache)
+        {
+            _distributedCache = distributedCache;
+        }
 
         public string Body
         {
@@ -31,106 +44,130 @@
             }
         }
 
-        private string _empireUrl = "https://www.empireonline.com";
-        private readonly List<INewsArticle> _newsArticles = new List<INewsArticle>();
-
         public IEnumerable<INewsArticle> NewsArticles()
         {
             HtmlWeb newsWeb = new HtmlWeb();
 
             HtmlDocument newsDocument = newsWeb.Load(SourceLink);
 
-            HtmlNodeCollection cardNodeList = newsDocument.DocumentNode.SelectNodes("//div[contains(concat(' ', normalize-space(@class), ' '), ' card ')]");
+            HtmlNodeCollection scriptNodeList = newsDocument.DocumentNode.SelectNodes("//script");
 
-            if (cardNodeList == null)
-            {
+            if (scriptNodeList == null)
                 return _newsArticles;
-            }
 
-            foreach (HtmlNode cardNode in cardNodeList)
+            foreach (HtmlNode scriptNode in scriptNodeList)
             {
-                AddNewsArticle(cardNode);
+                string nodeText = scriptNode.InnerText;
+                if (!nodeText.Contains("window.bootstrapComponents.push") 
+                    || !nodeText.Contains("cards") 
+                    || !nodeText.Contains('{') 
+                    || !nodeText.Contains('}'))
+                    continue;
+
+                AddNodeArticles(nodeText);
             }
 
             return _newsArticles;
         }
 
-        private void AddNewsArticle(HtmlNode cardNode)
+        private void AddNodeArticles(string nodeText)
         {
-            IEnumerable<HtmlNode> headerNodes = cardNode.Descendants("h3").ToList();
-            IEnumerable<HtmlNode> paragraphNodes = cardNode.Descendants("p").ToList();
-            IEnumerable<HtmlNode> linkNodes = cardNode.Descendants("a").ToList();
-            IEnumerable<HtmlNode> imageNodes = cardNode.Descendants("img").ToList();
-            IEnumerable<HtmlNode> spanNodes = cardNode.Descendants("span").ToList();
+            string nodeJson = nodeText.Substring(nodeText.IndexOf("{", StringComparison.Ordinal),
+                nodeText.LastIndexOf("}", StringComparison.Ordinal) -
+                nodeText.IndexOf("{", StringComparison.Ordinal) + 1);
+            NewsItemChunk newsItemChunk = JsonConvert.DeserializeObject<NewsItemChunk>(nodeJson);
 
-            NewsArticle article = new NewsArticle();
-
-            if (headerNodes.Any())
+            foreach (Item item in newsItemChunk.Data.Items)
             {
-                article.Title = headerNodes.First().InnerText;
+                NewsArticle article = new NewsArticle
+                {
+                    Guid = item.Id,
+                    Title = System.Web.HttpUtility.HtmlEncode(item.Title),
+                    Link = $"{_empireUrl}{item.Url}",
+                    Description = GetArticleDescription($"{_empireUrl}{item.Url}"),
+                    PublicationDate = GetPublicationDate(item.Date),
+                    ImageSrc = GetImageSource(item.Sources)
+                };
+                if (article.Description == string.Empty)
+                {
+                    article.Description = item.Description;
+                }
+
+                _newsArticles.Add(article);
             }
+        }
 
-            if (linkNodes.Any())
+        private string GetImageSource(List<Source> itemSources)
+        {
+            if (!itemSources.Any()) return string.Empty;
+
+            string itemImageSource = itemSources.First().Src;
+            int widthElementPosition = itemImageSource.LastIndexOf("&width=", StringComparison.OrdinalIgnoreCase);
+            if (widthElementPosition >= 0)
             {
-                string linkHref = linkNodes.First().GetAttributeValue("href", string.Empty);
-                article.Guid = linkHref;
-                if (!linkHref.StartsWith("http"))
-                {
-                    article.Link = $"{_empireUrl}{linkHref}";
-                }
-                else
-                {
-                    article.Link = linkHref;
-                }
+                itemImageSource = itemImageSource.Substring(0, widthElementPosition) + "&width=" + _desiredImageWidth;
             }
+            return $"https:{itemImageSource}";
+        }
 
-            if (paragraphNodes.Any())
+        private DateTime GetPublicationDate(string itemDate)
+        {
+            string[] dateElements = itemDate.Split(' ');
+            DateTime pubDate = DateTime.UtcNow;
+            try
             {
-                article.Description = paragraphNodes.First().InnerText;
-            }
-
-            if (imageNodes.Any())
-            {
-                string imgSrc = imageNodes.First().GetAttributeValue("src", string.Empty).Replace("width=750", "width=150");
-                if (!imgSrc.StartsWith("http"))
+                switch (dateElements[1])
                 {
-                    article.ImageSrc = $"http:{imgSrc}";
-                }
-                else
-                {
-                    article.ImageSrc = imgSrc;
-                }
-            }
-
-            if (spanNodes.Any())
-            {
-                string[] dateElements = spanNodes.Last().InnerText.Split(' ');
-                DateTime pubDate = DateTime.UtcNow;
-                try
-                {
-                    switch (dateElements[1])
-                    {
-                        case "hour":
-                            pubDate = pubDate.AddHours(-1);
-                            break;
-                        case "hours":
-                            pubDate = pubDate.AddHours(0d - double.Parse(dateElements[0]));
-                            break;
-                        case "day":
-                            pubDate = pubDate.AddDays(-1);
-                            break;
-                        case "days":
-                            pubDate = pubDate.AddDays(0d - double.Parse(dateElements[0]));
-                            break;
-                    }
-                }
-                finally
-                {
-                    article.PublicationDate = pubDate.AddMinutes(-_newsArticles.Count);
+                    case "hour":
+                        pubDate = pubDate.AddHours(-1);
+                        break;
+                    case "hours":
+                        pubDate = pubDate.AddHours(0d - double.Parse(dateElements[0]));
+                        break;
+                    case "day":
+                        pubDate = pubDate.AddDays(-1);
+                        break;
+                    case "days":
+                        pubDate = pubDate.AddDays(0d - double.Parse(dateElements[0]));
+                        break;
                 }
             }
+            finally
+            {
+                pubDate = pubDate.AddMinutes(-_newsArticles.Count);
+            }
 
-            _newsArticles.Add(article);
+            return pubDate;
+        }
+
+        private string GetArticleDescription(string articleLink)
+        {
+            HtmlDocument articleDocument;
+            string cachedDocument = _distributedCache.GetString(articleLink);
+            if (!string.IsNullOrEmpty(cachedDocument))
+            {
+                articleDocument = new HtmlDocument();
+                articleDocument.LoadHtml(cachedDocument);
+            }
+            else
+            {
+                HtmlWeb articleWeb = new HtmlWeb();
+                articleDocument = articleWeb.Load(articleLink);
+                _distributedCache.SetString(articleLink, articleDocument.DocumentNode.OuterHtml, cacheEntryOptions);
+            }
+
+            HtmlNode contentNode = articleDocument.DocumentNode.SelectSingleNode("//div[contains(concat(' ', normalize-space(@class), ' '), ' article__content ')]");
+            if (contentNode == null)
+                return string.Empty;
+
+            IEnumerable<HtmlNode> paragraphNodes = contentNode.Descendants("p");
+            StringBuilder descriptionBuilder = new StringBuilder();
+            foreach (HtmlNode paragraphNode in paragraphNodes)
+            {
+                descriptionBuilder.Append(paragraphNode.OuterHtml);
+            }
+
+            return System.Web.HttpUtility.HtmlEncode(descriptionBuilder.ToString());
         }
     }
 }
