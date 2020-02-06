@@ -1,7 +1,8 @@
-﻿namespace NewsFeeder.Repositories
+﻿namespace NewsFeeder.Repositories.Interfaces
 {
-    using Domain;
     using System.Collections.Generic;
+    using Domain;
+    using Domain.Interfaces;
 
     public interface INewsRepository
     {

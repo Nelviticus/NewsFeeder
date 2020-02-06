@@ -2,6 +2,7 @@
 {
     using System;
     using System.Text;
+    using Interfaces;
 
     public class NewsArticle: INewsArticle
     {

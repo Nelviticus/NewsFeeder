@@ -1,25 +1,30 @@
 ﻿namespace NewsFeeder.Repositories
 {
+    using DataTransferObjects.EmpireNews;
     using Domain;
     using HtmlAgilityPack;
+    using Microsoft.Extensions.Caching.Distributed;
+    using Newtonsoft.Json;
     using System;
     using System.Collections.Generic;
     using System.Linq;
     using System.Text;
-    using DataTransferObjects.EmpireNews;
-    using Newtonsoft.Json;
-    using Microsoft.Extensions.Caching.Distributed;
+    using Domain.Interfaces;
+    using Interfaces;
 
     public class EmpireNewsRepository: INewsRepository
     {
         public string Title => "Empire Latest Movie News";
         public string SourceLink => "https://www.empireonline.com/movies/news/";
         public string Description => "The latest movie news from Empire magazine";
-        private string _empireUrl = "https://www.empireonline.com";
+
+        private const string BaseUrl = "https://www.empireonline.com";
+        private const int DesiredImageWidth = 300;
         private readonly List<INewsArticle> _newsArticles = new List<INewsArticle>();
-        private readonly int _desiredImageWidth = 300;
-        private IDistributedCache _distributedCache;
-        private readonly DistributedCacheEntryOptions cacheEntryOptions = new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = new TimeSpan(1, 30, 0) };
+        private readonly IDistributedCache _distributedCache;
+
+        private readonly DistributedCacheEntryOptions _cacheEntryOptions = new DistributedCacheEntryOptions
+            {SlidingExpiration = TimeSpan.FromMinutes(90)};
 
         public EmpireNewsRepository(IDistributedCache distributedCache)
         {
@@ -72,10 +77,7 @@
 
         private void AddNodeArticles(string nodeText)
         {
-            string nodeJson = nodeText.Substring(nodeText.IndexOf("{", StringComparison.Ordinal),
-                nodeText.LastIndexOf("}", StringComparison.Ordinal) -
-                nodeText.IndexOf("{", StringComparison.Ordinal) + 1);
-            NewsItemChunk newsItemChunk = JsonConvert.DeserializeObject<NewsItemChunk>(nodeJson);
+            NewsItemChunk newsItemChunk = GetNewsItemChunkFromNodeText(nodeText);
 
             foreach (Item item in newsItemChunk.Data.Items)
             {
@@ -83,11 +85,12 @@
                 {
                     Guid = item.Id,
                     Title = System.Web.HttpUtility.HtmlEncode(item.Title),
-                    Link = $"{_empireUrl}{item.Url}",
-                    Description = GetArticleDescription($"{_empireUrl}{item.Url}"),
+                    Link = $"{BaseUrl}{item.Url}",
+                    Description = GetArticleDescription($"{BaseUrl}{item.Url}"),
                     PublicationDate = GetPublicationDate(item.Date),
                     ImageSrc = GetImageSource(item.Sources)
                 };
+
                 if (article.Description == string.Empty)
                 {
                     article.Description = item.Description;
@@ -95,6 +98,15 @@
 
                 _newsArticles.Add(article);
             }
+        }
+
+        private static NewsItemChunk GetNewsItemChunkFromNodeText(string nodeText)
+        {
+            string nodeJson = nodeText.Substring(nodeText.IndexOf("{", StringComparison.Ordinal),
+                nodeText.LastIndexOf("}", StringComparison.Ordinal) -
+                nodeText.IndexOf("{", StringComparison.Ordinal) + 1);
+            NewsItemChunk newsItemChunk = JsonConvert.DeserializeObject<NewsItemChunk>(nodeJson);
+            return newsItemChunk;
         }
 
         private string GetImageSource(List<Source> itemSources)
@@ -105,7 +117,7 @@
             int widthElementPosition = itemImageSource.LastIndexOf("&width=", StringComparison.OrdinalIgnoreCase);
             if (widthElementPosition >= 0)
             {
-                itemImageSource = itemImageSource.Substring(0, widthElementPosition) + "&width=" + _desiredImageWidth;
+                itemImageSource = itemImageSource.Substring(0, widthElementPosition) + "&width=" + DesiredImageWidth;
             }
             return $"https:{itemImageSource}";
         }
@@ -142,19 +154,7 @@
 
         private string GetArticleDescription(string articleLink)
         {
-            HtmlDocument articleDocument;
-            string cachedDocument = _distributedCache.GetString(articleLink);
-            if (!string.IsNullOrEmpty(cachedDocument))
-            {
-                articleDocument = new HtmlDocument();
-                articleDocument.LoadHtml(cachedDocument);
-            }
-            else
-            {
-                HtmlWeb articleWeb = new HtmlWeb();
-                articleDocument = articleWeb.Load(articleLink);
-                _distributedCache.SetString(articleLink, articleDocument.DocumentNode.OuterHtml, cacheEntryOptions);
-            }
+            HtmlDocument articleDocument = GetArticleDocument(articleLink);
 
             HtmlNode contentNode = articleDocument.DocumentNode.SelectSingleNode("//div[contains(concat(' ', normalize-space(@class), ' '), ' article__content ')]");
             if (contentNode == null)
@@ -168,6 +168,25 @@
             }
 
             return System.Web.HttpUtility.HtmlEncode(descriptionBuilder.ToString());
+        }
+
+        private HtmlDocument GetArticleDocument(string articleLink)
+        {
+            HtmlDocument articleDocument;
+            string cachedDocumentHtml = _distributedCache.GetString(articleLink);
+            if (!string.IsNullOrEmpty(cachedDocumentHtml))
+            {
+                articleDocument = new HtmlDocument();
+                articleDocument.LoadHtml(cachedDocumentHtml);
+            }
+            else
+            {
+                HtmlWeb articleWeb = new HtmlWeb();
+                articleDocument = articleWeb.Load(articleLink);
+                _distributedCache.SetString(articleLink, articleDocument.DocumentNode.OuterHtml, _cacheEntryOptions);
+            }
+
+            return articleDocument;
         }
     }
 }

@@ -3,6 +3,7 @@
     using Microsoft.AspNetCore.Mvc.RazorPages;
     using Microsoft.Extensions.Caching.Distributed;
     using Repositories;
+    using Repositories.Interfaces;
 
     public class EmpireNewsModel : PageModel
     {
@@ -11,7 +12,7 @@
         public string SourceLink { get; set; }
         public string SelfLink { get; set; }
         public string Description { get; set; }
-                private IDistributedCache _distributedCache;
+        private readonly IDistributedCache _distributedCache;
 
         public EmpireNewsModel(IDistributedCache distributedCache)
         {

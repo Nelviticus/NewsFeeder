@@ -1,4 +1,4 @@
-﻿namespace NewsFeeder.Domain
+﻿namespace NewsFeeder.Domain.Interfaces
 {
     using System;
 
