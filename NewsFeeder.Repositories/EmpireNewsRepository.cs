@@ -101,7 +101,7 @@
 
             if (imageNodes.Any())
             {
-                string imgSrc = imageNodes.First().GetAttributeValue("src", string.Empty).Replace("width=750", "width=150");
+                string imgSrc = imageNodes.First().GetAttributeValue("data-src", string.Empty).Replace("width=750", "width=150");
                 if (!imgSrc.StartsWith("http"))
                 {
                     article.ImageSrc = $"http:{imgSrc}";
@@ -209,7 +209,7 @@
                 _distributedCache.SetString(articleLink, articleDocument.DocumentNode.OuterHtml, cacheEntryOptions);
             }
 
-            HtmlNode contentNode = articleDocument.DocumentNode.SelectSingleNode("//div[contains(concat(' ', normalize-space(@class), ' '), ' article__content ')]");
+            HtmlNode contentNode = articleDocument.DocumentNode.Descendants("div").Where(d => d.HasClass("article-content")).First();
             if (contentNode == null)
                 return string.Empty;
 
