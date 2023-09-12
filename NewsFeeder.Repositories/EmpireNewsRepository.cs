@@ -209,7 +209,7 @@
                 _distributedCache.SetString(articleLink, articleDocument.DocumentNode.OuterHtml, cacheEntryOptions);
             }
 
-            HtmlNode contentNode = articleDocument.DocumentNode.Descendants("div").Where(d => d.HasClass("article-content")).First();
+            HtmlNode contentNode = articleDocument.DocumentNode.Descendants("article").FirstOrDefault();
             if (contentNode == null)
                 return string.Empty;
 
