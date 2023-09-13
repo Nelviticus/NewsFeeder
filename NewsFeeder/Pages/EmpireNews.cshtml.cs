@@ -11,12 +11,13 @@
         public string SourceLink { get; set; }
         public string SelfLink { get; set; }
         public string Description { get; set; }
-                private IDistributedCache _distributedCache;
+        private IDistributedCache _distributedCache;
 
         public EmpireNewsModel(IDistributedCache distributedCache)
         {
             _distributedCache = distributedCache;
         }
+
         public void OnGet()
         {
             SelfLink = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}{HttpContext.Request.Path}{HttpContext.Request.QueryString}";

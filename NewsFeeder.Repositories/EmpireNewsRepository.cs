@@ -4,6 +4,7 @@
     using HtmlAgilityPack;
     using System;
     using System.Collections.Generic;
+    using System.Globalization;
     using System.Linq;
     using System.Text;
     using DataTransferObjects.EmpireNews;
@@ -50,24 +51,76 @@
 
             HtmlDocument newsDocument = newsWeb.Load(SourceLink);
 
-            HtmlNodeCollection scriptNodeList = newsDocument.DocumentNode.SelectNodes("//script");
+            IEnumerable<HtmlNode> cardNodes = newsDocument.DocumentNode.Descendants("div").Where(d => d.HasClass("card"));
 
-            if (scriptNodeList == null)
-                return _newsArticles;
-
-            foreach (HtmlNode scriptNode in scriptNodeList)
+            foreach (HtmlNode cardNode in cardNodes)
             {
-                string nodeText = scriptNode.InnerText;
-                if (!nodeText.Contains("window.bootstrapComponents.push") 
-                    || !nodeText.Contains("cards") 
-                    || !nodeText.Contains('{') 
-                    || !nodeText.Contains('}'))
-                    continue;
-
-                AddNodeArticles(nodeText);
+                AddNewsArticle(cardNode);
             }
 
             return _newsArticles;
+        }
+
+        private void AddNewsArticle(HtmlNode cardNode)
+        {
+            IEnumerable<HtmlNode> headerNodes = cardNode.Descendants("h3").ToList();
+            IEnumerable<HtmlNode> linkNodes = cardNode.Descendants("a").ToList();
+            IEnumerable<HtmlNode> paragraphNodes = cardNode.Descendants("p").ToList();
+            IEnumerable<HtmlNode> imageNodes = cardNode.Descendants("img").ToList();
+            IEnumerable<HtmlNode> timeNodes = cardNode.Descendants("time").ToList();
+
+            NewsArticle article = new NewsArticle();
+
+            if (headerNodes.Any())
+            {
+                article.Title = headerNodes.First().InnerText;
+            }
+
+            if (linkNodes.Any())
+            {
+                string linkHref = linkNodes.First().GetAttributeValue("href", string.Empty);
+                article.Guid = linkHref;
+                string link;
+                if (!linkHref.StartsWith("http"))
+                {
+                    link = $"{_empireUrl}{linkHref}";
+                }
+                else
+                {
+                    link = linkHref;
+                }
+
+                article.Link = link;
+                article.Description = GetArticleDescription(link);
+            }
+
+            if (article.Description == string.Empty && paragraphNodes.Any())
+            {
+                article.Description = paragraphNodes.First().InnerText;
+            }
+
+            if (imageNodes.Any())
+            {
+                string imgSrc = imageNodes.First().GetAttributeValue("data-src", string.Empty).Replace("width=750", "width=150");
+                if (!imgSrc.StartsWith("http"))
+                {
+                    article.ImageSrc = $"http:{imgSrc}";
+                }
+                else
+                {
+                    article.ImageSrc = imgSrc;
+                }
+            }
+
+            if (timeNodes.Any())
+            {
+                string dateTime = timeNodes.First().GetAttributeValue("dateTime", string.Empty);
+                DateTime.TryParse(dateTime, CultureInfo.GetCultureInfo("en-GB").DateTimeFormat, DateTimeStyles.None,
+                    out var pubDate);
+                article.PublicationDate = pubDate.AddMinutes(-_newsArticles.Count);
+            }
+
+            _newsArticles.Add(article);
         }
 
         private void AddNodeArticles(string nodeText)
@@ -156,7 +209,7 @@
                 _distributedCache.SetString(articleLink, articleDocument.DocumentNode.OuterHtml, cacheEntryOptions);
             }
 
-            HtmlNode contentNode = articleDocument.DocumentNode.SelectSingleNode("//div[contains(concat(' ', normalize-space(@class), ' '), ' article__content ')]");
+            HtmlNode contentNode = articleDocument.DocumentNode.Descendants("article").FirstOrDefault();
             if (contentNode == null)
                 return string.Empty;
 
