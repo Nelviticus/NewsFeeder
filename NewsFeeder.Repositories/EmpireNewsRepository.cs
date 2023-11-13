@@ -51,7 +51,7 @@
 
             HtmlDocument newsDocument = newsWeb.Load(SourceLink);
 
-            IEnumerable<HtmlNode> cardNodes = newsDocument.DocumentNode.Descendants("div").Where(d => d.HasClass("card"));
+            IEnumerable<HtmlNode> cardNodes = newsDocument.DocumentNode.Descendants("div").Where(d => d.GetAttributeValue("class", "").StartsWith("card_"));
 
             foreach (HtmlNode cardNode in cardNodes)
             {
