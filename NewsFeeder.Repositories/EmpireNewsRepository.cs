@@ -16,11 +16,11 @@
         public string Title => "Empire Latest Movie News";
         public string SourceLink => "https://www.empireonline.com/movies/news/";
         public string Description => "The latest movie news from Empire magazine";
-        private string _empireUrl = "https://www.empireonline.com";
+        private const string EmpireUrl = "https://www.empireonline.com";
         private readonly List<INewsArticle> _newsArticles = new List<INewsArticle>();
-        private readonly int _desiredImageWidth = 300;
-        private IDistributedCache _distributedCache;
-        private readonly DistributedCacheEntryOptions cacheEntryOptions = new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = new TimeSpan(1, 30, 0) };
+        private const int DesiredImageWidth = 300;
+        private readonly IDistributedCache _distributedCache;
+        private readonly DistributedCacheEntryOptions _cacheEntryOptions = new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = new TimeSpan(1, 30, 0) };
 
         public EmpireNewsRepository(IDistributedCache distributedCache)
         {
@@ -51,12 +51,16 @@
 
             HtmlDocument newsDocument = newsWeb.Load(SourceLink);
 
-            IEnumerable<HtmlNode> cardNodes = newsDocument.DocumentNode.Descendants("div").Where(d => d.GetAttributeValue("class", "").StartsWith("card_"));
+            HtmlNode scriptNode = newsDocument.DocumentNode.SelectSingleNode("//script[@id='__NEXT_DATA__']");
 
-            foreach (HtmlNode cardNode in cardNodes)
-            {
-                AddNewsArticle(cardNode);
-            }
+            AddNodeArticles(scriptNode.InnerText);
+
+            //IEnumerable<HtmlNode> cardNodes = newsDocument.DocumentNode.Descendants("div").Where(d => d.GetAttributeValue("class", "").StartsWith("card_"));
+
+            //foreach (HtmlNode cardNode in cardNodes)
+            //{
+            //    AddNewsArticle(cardNode);
+            //}
 
             return _newsArticles;
         }
@@ -83,7 +87,7 @@
                 string link;
                 if (!linkHref.StartsWith("http"))
                 {
-                    link = $"{_empireUrl}{linkHref}";
+                    link = $"{EmpireUrl}{linkHref}";
                 }
                 else
                 {
@@ -136,8 +140,8 @@
                 {
                     Guid = item.Id,
                     Title = System.Web.HttpUtility.HtmlEncode(item.Title),
-                    Link = $"{_empireUrl}{item.Url}",
-                    Description = GetArticleDescription($"{_empireUrl}{item.Url}"),
+                    Link = $"{EmpireUrl}{item.Url}",
+                    Description = GetArticleDescription($"{EmpireUrl}{item.Url}"),
                     PublicationDate = GetPublicationDate(item.Date),
                     ImageSrc = GetImageSource(item.Sources)
                 };
@@ -158,7 +162,7 @@
             int widthElementPosition = itemImageSource.LastIndexOf("&width=", StringComparison.OrdinalIgnoreCase);
             if (widthElementPosition >= 0)
             {
-                itemImageSource = itemImageSource.Substring(0, widthElementPosition) + "&width=" + _desiredImageWidth;
+                itemImageSource = itemImageSource.Substring(0, widthElementPosition) + "&width=" + DesiredImageWidth;
             }
             return $"https:{itemImageSource}";
         }
@@ -206,7 +210,7 @@
             {
                 HtmlWeb articleWeb = new HtmlWeb();
                 articleDocument = articleWeb.Load(articleLink);
-                _distributedCache.SetString(articleLink, articleDocument.DocumentNode.OuterHtml, cacheEntryOptions);
+                _distributedCache.SetString(articleLink, articleDocument.DocumentNode.OuterHtml, _cacheEntryOptions);
             }
 
             HtmlNode contentNode = articleDocument.DocumentNode.Descendants("article").FirstOrDefault();
